@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlycoPeptide Designer & Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>body { background-color: #f4f6f9; }</style>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid"><a class="navbar-brand" href="#">🔬 GlycoPeptide Analyzer v12.0 (Formula & Skyline Export Optimized)</a></div>
+</nav>
+<div class="container-fluid mt-4 px-4">
+    <div class="row">
+        <!-- Left Panel -->
+        <div class="col-md-3">
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-white"><strong>1. UniProt Integration</strong></div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text" id="uniprotId" class="form-control" placeholder="e.g.: P01857" value="P01857">
+                        <button class="btn btn-outline-primary" type="button" id="btnUniProt">Fetch</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-white"><strong>2. Analysis Parameters</strong></div>
+                <div class="card-body">
+                    <form id="analyzeForm">
+                        <div class="mb-3">
+                            <label class="form-label">Protein Sequence</label>
+                            <textarea class="form-control" id="sequence" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-7">
+                                <label class="form-label">Enzyme</label>
+                                <select class="form-select form-select-sm" id="enzyme">
+                                    <option value="trypsin" selected>Trypsin</option>
+                                    <option value="trypsin+lys-c">Trypsin / Lys-C</option>
+                                    <option value="chymotrypsin">Chymotrypsin</option>
+                                    <option value="lys-c">Lys-C</option>
+                                    <option value="glu-c">Glu-C</option>
+                                    <option value="pronase">Pronase (Non-Specific)</option>
+                                    <option value="pepsin">Pepsin</option>
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label">Missed Cleave</label>
+                                <input type="number" class="form-control form-control-sm" id="missedCleavages" value="2" min="0" max="5">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6"><label class="form-label">Min Pep. Length</label><input type="number" id="pepMin" class="form-control form-control-sm" value="4"></div>
+                            <div class="col-6"><label class="form-label">Max Pep. Length</label><input type="number" id="pepMax" class="form-control form-control-sm" value="30"></div>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-primary">Modifications (PTMs)</h6>
+                        <div class="form-check" style="font-size: 0.9rem;">
+                            <input class="form-check-input" type="checkbox" id="modCarb" value="carbamidomethyl_c" checked>
+                            <label class="form-check-label" for="modCarb">Carbamidomethyl (C) [+57.02 Da]</label>
+                        </div>
+                        <div class="form-check mb-3" style="font-size: 0.9rem;">
+                            <input class="form-check-input" type="checkbox" id="modOxi" value="oxidation_m" checked>
+                            <label class="form-check-label" for="modOxi">Oxidation (M) [+15.99 Da]</label>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-primary">Glycan Ranges</h6>
+                        <div class="row g-2 text-center align-items-center">
+                            <div class="col-4 text-start"><strong>Hex</strong></div>
+                            <div class="col-4"><input type="number" id="hMin" class="form-control form-control-sm" value="3"></div>
+                            <div class="col-4"><input type="number" id="hMax" class="form-control form-control-sm" value="4"></div>
+                            <div class="col-4 text-start"><strong>HexNAc</strong></div>
+                            <div class="col-4"><input type="number" id="nMin" class="form-control form-control-sm" value="2"></div>
+                            <div class="col-4"><input type="number" id="nMax" class="form-control form-control-sm" value="4"></div>
+                            <div class="col-4 text-start"><strong>Fuc</strong></div>
+                            <div class="col-4"><input type="number" id="fMin" class="form-control form-control-sm" value="0"></div>
+                            <div class="col-4"><input type="number" id="fMax" class="form-control form-control-sm" value="1"></div>
+                            <div class="col-4 text-start"><strong>Neu5Ac</strong></div>
+                            <div class="col-4"><input type="number" id="sMin" class="form-control form-control-sm" value="0"></div>
+                            <div class="col-4"><input type="number" id="sMax" class="form-control form-control-sm" value="1"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 mt-4">Start Analysis</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="col-md-9">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>Precursor m/z and Isotopic Profiles</strong>
+                    
+                    <div class="btn-group" id="exportGroup" style="display:none;">
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportSkylineCSV()">Skyline (CSV)</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="exportOrbitrapCSV()">Orbitrap PRM (CSV)</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="exportDetailedExcel()">Detailed (Excel)</button>
+                    </div>
+
+                </div>
+                <div class="card-body p-0" style="overflow-x: auto; max-height: 850px;">
+                    <table class="table table-hover mb-0" style="font-size: 0.85rem;">
+                        <thead class="table-light" style="position: sticky; top: 0;">
+                            <tr>
+                                <th>Length</th><th>Sequence</th><th>PTMs</th><th>Glycan</th><th>m/z (+2)</th><th>m/z (+3)</th><th>m/z (+4)</th><th style="min-width: 100px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <tr><td colspan="8" class="text-center py-4">Define parameters on the left and click "Start Analysis".</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Isotope Modal -->
+<div class="modal fade" id="isotopeModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Isotopic Distribution</h5>
+        <div class="ms-3">
+            <select class="form-select form-select-sm" id="chargeSelect" onchange="updateIsotopeChart()">
+                <option value="z2">Charge +2</option>
+                <option value="z3" selected>Charge +3</option>
+                <option value="z4">Charge +4</option>
+            </select>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="isotopeChart" width="400" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let globalResults = [];
+    let isotopeChartInstance = null;
+    let currentItemIndex = 0;
+
+    document.getElementById('btnUniProt').addEventListener('click', async () => {
+        const acc = document.getElementById('uniprotId').value;
+        try {
+            const res = await fetch(`http://localhost:8000/api/uniprot/${acc}`);
+            const data = await res.json();
+            if(data.mature_sequence) {
+                document.getElementById('sequence').value = data.mature_sequence;
+                alert('UniProt sequence fetched successfully.');
+            }
+        } catch (e) { alert('Failed: ' + e); }
+    });
+
+    document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const static_mods = document.getElementById('modCarb').checked ? ["carbamidomethyl_c"] : [];
+        const variable_mods = document.getElementById('modOxi').checked ? ["oxidation_m"] : [];
+
+        const payload = {
+            sequence: document.getElementById('sequence').value.trim(),
+            enzyme: document.getElementById('enzyme').value,
+            missed_cleavages: parseInt(document.getElementById('missedCleavages').value),
+            pep_min_len: parseInt(document.getElementById('pepMin').value),
+            pep_max_len: parseInt(document.getElementById('pepMax').value),
+            static_mods: static_mods,
+            variable_mods: variable_mods,
+            glycan_ranges: {
+                Hex: {min: parseInt(document.getElementById('hMin').value), max: parseInt(document.getElementById('hMax').value)},
+                HexNAc: {min: parseInt(document.getElementById('nMin').value), max: parseInt(document.getElementById('nMax').value)},
+                Fuc: {min: parseInt(document.getElementById('fMin').value), max: parseInt(document.getElementById('fMax').value)},
+                Neu5Ac: {min: parseInt(document.getElementById('sMin').value), max: parseInt(document.getElementById('sMax').value)}
+            }
+        };
+
+        document.getElementById('resultsTableBody').innerHTML = '<tr><td colspan="8" class="text-center py-4">Calculating...</td></tr>';
+        document.getElementById('exportGroup').style.display = 'none';
+        
+        try {
+            const res = await fetch('http://localhost:8000/api/analyze', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            globalResults = data.results;
+            
+            let html = '';
+            globalResults.forEach((item, index) => {
+                let seq = item.sequence.replace(item.motif, `<strong class="text-danger">${item.motif}</strong>`);
+                let ptmBadge = item.peptide_mods === 'None' ? '<span class="text-muted">None</span>' : `<span class="badge bg-secondary">${item.peptide_mods}</span>`;
+                html += `<tr>
+                    <td>${item.length} AA</td>
+                    <td style="font-family: monospace; font-size: 11.5px;">${seq}</td>
+                    <td>${ptmBadge}</td>
+                    <td><span class="badge bg-success">${item.glycan}</span></td>
+                    <td>${item.mz_2.toFixed(4)}</td>
+                    <td>${item.mz_3.toFixed(4)}</td>
+                    <td>${item.mz_4.toFixed(4)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info w-100" onclick="openIsotopeModal(${index})">View Isotope</button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('resultsTableBody').innerHTML = html || '<tr><td colspan="8" class="text-center">No peptides found.</td></tr>';
+            if (globalResults.length > 0) document.getElementById('exportGroup').style.display = 'inline-flex';
+        } catch (e) {
+            document.getElementById('resultsTableBody').innerHTML = `<tr><td colspan="8" class="text-danger">${e}</td></tr>`;
+        }
+    });
+
+    // ISOTOPE LOGIC
+    window.openIsotopeModal = function(index) {
+        currentItemIndex = index;
+        document.getElementById('chargeSelect').value = "z3"; 
+        updateIsotopeChart();
+        new bootstrap.Modal(document.getElementById('isotopeModal')).show();
+    };
+
+    window.updateIsotopeChart = function() {
+        const item = globalResults[currentItemIndex];
+        const chargeKey = document.getElementById('chargeSelect').value;
+        const isotopeData = item.isotopes[chargeKey];
+        
+        const ctx = document.getElementById('isotopeChart').getContext('2d');
+        const labels = isotopeData.map(i => i.label + " (" + i.mz.toFixed(3) + ")");
+        const data = isotopeData.map(i => i.intensity);
+
+        if(isotopeChartInstance) isotopeChartInstance.destroy();
+
+        isotopeChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Relative Intensity (%)',
+                    data: data,
+                    backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                    barThickness: 3 
+                }]
+            },
+            options: {
+                scales: { y: { beginAtZero: true, max: 105 } },
+                plugins: { title: { display: true, text: `${item.glycan} (${chargeKey.replace('z', 'z=+')})` } },
+                animation: { duration: 300 }
+            }
+        });
+    };
+
+    // --- CSV GENERATOR HELPER ---
+    function downloadCSV(dataArray, filename) {
+        const ws = XLSX.utils.json_to_sheet(dataArray);
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // --- EXPORT 1: SKYLINE CSV (FORMULA MODE) ---
+    window.exportSkylineCSV = function() {
+        if (globalResults.length === 0) return;
+        const skylineList = [];
+        let baseProteinName = document.getElementById('uniprotId').value.trim() || "Target";
+
+        globalResults.forEach(item => {
+            let noteInfo = `Glycan: ${item.glycan}`;
+            if(item.peptide_mods !== "None") noteInfo += ` | Mods: ${item.peptide_mods}`;
+
+            [2, 3, 4].forEach(z => {
+                let precursorMz = item[`mz_${z}`];
+                
+                // Formatted as "UniProt_Peptide_Glycan"
+                let listName = `${baseProteinName}_${item.sequence}_${item.glycan}`;
+                
+                // Skyline 'Small Molecule' Transition List Format
+                skylineList.push({
+                    "Molecule List Name": listName,
+                    "Molecule Name": `${item.sequence}`,
+                    "Chemical Formula": item.formula,
+                    "Precursor Charge": z,
+                    "Precursor m/z": precursorMz,
+                    "Note": noteInfo
+                });
+            });
+        });
+        downloadCSV(skylineList, "Skyline_Transition_List.csv");
+        
+        // Brief instruction alert
+        alert("IMPORTANT FOR SKYLINE:\n\nWhen importing this CSV into Skyline (Edit > Insert > Transition List), make sure to select the 'Molecules' radio button at the bottom left. Skyline will use the 'Chemical Formula' to calculate exact masses without sequence errors.");
+    };
+
+    // --- EXPORT 2: ORBITRAP PRM CSV ---
+    window.exportOrbitrapCSV = function() {
+        if (globalResults.length === 0) return;
+        const thermoPRM = [];
+        let baseProteinName = document.getElementById('uniprotId').value.trim() || "Target";
+
+        globalResults.forEach(item => {
+            let noteInfo = `Glycan: ${item.glycan}`;
+            if(item.peptide_mods !== "None") noteInfo += ` | Mods: ${item.peptide_mods}`;
+
+            [2, 3, 4].forEach(z => {
+                let proteinName = `${baseProteinName}_${item.sequence}_${item.glycan}_z${z}`;
+                thermoPRM.push({
+                    "Mass [m/z]": item[`mz_${z}`],
+                    "Formula": item.sequence,
+                    "CS [z]": z,
+                    "Polarity": "Positive",
+                    "Start [min]": "", 
+                    "End [min]": "",   
+                    "(N)CE": "27",     
+                    "Protein Name": proteinName,
+                    "Comment": noteInfo
+                });
+            });
+        });
+        downloadCSV(thermoPRM, "Orbitrap_Inclusion_List.csv");
+    };
+
+    // --- EXPORT 3: DETAILED EXCEL ---
+    window.exportDetailedExcel = function() {
+        if (globalResults.length === 0) return;
+        let baseProteinName = document.getElementById('uniprotId').value.trim() || "Target";
+        
+        const detailedData = globalResults.map(item => ({
+            "UniProt ID": baseProteinName,
+            "Peptide Sequence": item.sequence,
+            "Length": item.length,
+            "Start Pos": item.start_pos,
+            "End Pos": item.end_pos,
+            "Glycosylation Motif": item.motif,
+            "PTMs": item.peptide_mods,
+            "Glycan": item.glycan,
+            "Chemical Formula": item.formula,
+            "Neutral Mass (Da)": item.neutral_mass,
+            "m/z (+2)": item.mz_2,
+            "m/z (+3)": item.mz_3,
+            "m/z (+4)": item.mz_4
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+        wsDetailed['!cols'] = [{wch:15}, {wch:30}, {wch:8}, {wch:10}, {wch:10}, {wch:15}, {wch:25}, {wch:15}, {wch:25}, {wch:18}, {wch:12}, {wch:12}, {wch:12}];
+        XLSX.utils.book_append_sheet(wb, wsDetailed, "Detailed Results");
+        XLSX.writeFile(wb, "Detailed_Glycopeptide_Analysis.xlsx");
+    };
+</script>
+</body>
+</html>
