@@ -154,7 +154,7 @@
     document.getElementById('btnUniProt').addEventListener('click', async () => {
         const acc = document.getElementById('uniprotId').value;
         try {
-            const res = await fetch(`http://localhost:8000/api/uniprot/${acc}`);
+            const res = await fetch(`/api/uniprot/${acc}`);
             const data = await res.json();
             if(data.mature_sequence) {
                 document.getElementById('sequence').value = data.mature_sequence;
@@ -189,7 +189,7 @@
         document.getElementById('exportGroup').style.display = 'none';
         
         try {
-            const res = await fetch('http://localhost:8000/api/analyze', {
+            const res = await fetch('/api/analyze', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             const data = await res.json();
