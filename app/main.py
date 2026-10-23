@@ -1,6 +1,6 @@
-from fastapi.responses import FileResponse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict
 
@@ -9,7 +9,11 @@ from app.services.digestion_service import DigestionService
 from app.services.glycosylation_service import GlycosylationService
 from app.services.mass_calculator import MassCalculator
 
-app = FastAPI(title="GlycoPeptide Analyzer")
+app = FastAPI(title="GlycoPeptide Analyzer v12")
+
+@app.get("/", include_in_schema=False)
+async def home():
+    return FileResponse("/app/index.html")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 uniprot_service = UniProtService()
